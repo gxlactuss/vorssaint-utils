@@ -1430,6 +1430,12 @@ enum CommandBarFeatureTests {
         suite.expect(CommandBarRowShortcuts.appKey(bundleID: "com.apple.mail", path: "/Applications/Mail.app")
                 == "app.bundle.com.apple.mail",
                "an app with a bundle ID is listed by it, not by where it lives")
+        // The uninstaller frees the row under this same key, so the catalog
+        // must build it here rather than spell the format out again.
+        suite.expect(commandBarCatalogLines.contains {
+                    $0.contains("stableKey: CommandBarRowShortcuts.appKey(bundleID: app.bundleID, path: app.id)")
+                },
+               "an app row is keyed by the same seam the uninstaller frees it under")
 
         // ⌃⌘D is Look Up (symbolic hotkey 70), which System Settings does not
         // list: an app row must offer to take it over, as a window layout row

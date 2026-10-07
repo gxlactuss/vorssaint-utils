@@ -248,6 +248,7 @@ final class AppUninstaller: ObservableObject {
 
         let allowedPaths = allowedRemovalPaths
         let targetURL = target?.url
+        let targetBundleID = target?.bundleID
         let expectedTargetIdentity = targetFileIdentity
         let expectedInfoIdentity = targetInfoIdentity
         let candidateBundleIDs = Set(chosen.compactMap(\.ownerBundleID))
@@ -376,6 +377,9 @@ final class AppUninstaller: ObservableObject {
                 guard let self, self.phase == .removing else { return }
                 self.items = []
                 self.phase = .done(freed: freed, failed: failed)
+                if let targetURL {
+                    Self.releaseCommandBarShortcut(ofRemovedAppAt: targetURL, bundleID: targetBundleID)
+                }
             }
         }
     }
@@ -442,6 +446,22 @@ final class AppUninstaller: ObservableObject {
             removeSelected()
         } else {
             phase = .done(freed: homebrewRemovalSize, failed: [])
+            Self.releaseCommandBarShortcut(ofRemovedAppAt: targetURL, bundleID: target?.bundleID)
+        }
+    }
+
+    /// A removed app's own Command Bar shortcut goes with it, so the keys can
+    /// be given to another app. Checked off the main thread, since finding
+    /// another installed copy reads every application folder.
+    private static func releaseCommandBarShortcut(ofRemovedAppAt url: URL, bundleID: String?) {
+        DispatchQueue.global(qos: .utility).async {
+            guard UninstallerSupport.isConfirmedAbsent(at: url) else { return }
+            let remaining = Set(InstalledApps.installedApplications(includeSystemApplications: true)
+                .compactMap(\.bundleID))
+            guard let key = CommandBarRowShortcuts.keyFreed(
+                byRemovingAppAt: url.standardizedFileURL.path, bundleID: bundleID,
+                remainingBundleIDs: remaining) else { return }
+            DispatchQueue.main.async { CommandBarService.shared.forgetRowShortcut(forKey: key) }
         }
     }
 
